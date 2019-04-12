@@ -5,49 +5,56 @@ http.globalAgent.maxSockets = 128;
 var parseString = require('xml2js').parseString;
 var fs = require('fs');
 var authentication = process.env.UCM_USER+':'+process.env.UCM_PASS;
+var skipUnregistered = process.env.SKIP_UNREGISTERED || 'false';
 
 function getPhoneSerial(phone) {
   return new Promise((resolve, reject) => {
-    // console.log('getting phone details '+phone.ipAddress);
-    var xml = '';
-    http.get({
-      host: phone.ipAddress,
-      port: 80,
-      path: '/DeviceInformationX',
-    }, function(res) {
-      res.setEncoding('utf8');
-      res.on('data', function(d) {
-        xml += d;
-      });
-      res.on('end', function(){
-        // console.log('phone details', xml);
-        parseString(xml, function (err, result) {
-          var r = result["DeviceInformation"];
-          // console.log(r);
+    console.log('getting phone details '+phone.status);
+    if (phone.status !== 'UnRegistered' || skipUnregistered) {
+     console.log (phone.status)
+     var xml = '';
+     http.get({
+       host: phone.ipAddress,
+       port: 80,
+       path: '/DeviceInformationX',
+     }, function(res) {
+       res.setEncoding('utf8');
+       res.on('data', function(d) {
+         xml += d;
+       });
+       res.on('end', function(){
+         console.log('phone details', xml);
+         parseString(xml, function (err, result) {
+           var r = result["DeviceInformation"];
+           console.log(r);
          if (typeof r["serialNumber"] !== 'undefined'){
-                phone.serial = r["serialNumber"][0];
-          } else if (typeof r["SerialNumber"] !== 'undefined'){
-                phone.serial = r["SerialNumber"][0];
-          }
-          if (typeof r["modelNumber"] !== 'undefined'){
-                phone.model = r["modelNumber"][0];
-          } else if (typeof r["ModelNumber"] !== 'undefined'){
-                phone.model = r["ModelNumber"][0];
-          }
-          resolve(phone);
-        });
-
-      });
-      res.on('error', function(err){
-        resolve(phone);
-      });
-    }).on('error', function(err){
-      // console.error(err);
-      resolve(phone);
-    }).on('socket', function(socket){
-      socket.setTimeout(5000);
-    });
-
+                 phone.serial = r["serialNumber"][0];
+           } else if (typeof r["SerialNumber"] !== 'undefined'){
+                 phone.serial = r["SerialNumber"][0];
+           }
+           if (typeof r["modelNumber"] !== 'undefined'){
+                 phone.model = r["modelNumber"][0];
+           } else if (typeof r["ModelNumber"] !== 'undefined'){
+                 phone.model = r["ModelNumber"][0];
+           }
+           resolve(phone);
+         });
+    
+       });
+       res.on('error', function(err){
+         resolve(phone);
+       });
+     }).on('error', function(err){
+       console.error(err);
+       resolve(phone);
+     }).on('socket', function(socket){
+       socket.setTimeout(2000);
+     });
+   } else {
+	phone.serial = 'NAN';
+	phone.model = 'NAN';
+	resolve(phone);     
+   }; 
   });
 }
 
